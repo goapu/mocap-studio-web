@@ -22,7 +22,7 @@ From the repository root:
 
 Use **Python 3.12 or 3.13**, Node.js 22+ and npm. The validated development machine used Python 3.13.5 and Node.js 24.14.1 on macOS arm64.
 
-```bash
+bash
 python3 scripts/manage.py setup
 python3 scripts/manage.py doctor
 python3 scripts/manage.py start
