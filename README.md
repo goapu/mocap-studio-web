@@ -128,7 +128,7 @@ Calibration schema and capture guidance
 
 Operator troubleshooting
 
-Configuration
+#Configuration
 MOCAP_DATA_DIR and MOCAP_MODEL_DIR optionally relocate session and model storage. MOCAP_PYTHON optionally selects an existing environment for the launcher. Set overrides as environment variables; .env.example documents them but is not loaded automatically.
 
 The server is intended for a single local workstation and binds to loopback. It rejects browser requests with nonlocal origins. It has no authentication, multi-user isolation, remote deployment configuration, or public hosting setup.
@@ -138,7 +138,7 @@ RTMPose-M is a practical CPU baseline with an explicit ONNX path and established
 
 See RTMPose, RTMLib, and third-party notices. Code and checkpoint provenance are distinct; retain upstream notices and review checkpoint terms for your intended distribution.
 
-License
+#License
 This project is licensed under the MIT License.
 
 Note that the model weights (RTMPose-M, YOLOX-M) and certain third-party dependencies may be subject to their own respective licenses. Please review THIRD_PARTY_NOTICES.md for details on upstream code and checkpoint provenance before distributing derivative works.
