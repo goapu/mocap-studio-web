@@ -1,0 +1,35 @@
+# Local recordings, annotations, models, and generated media
+.local/
+data/
+models/
+*.onnx
+*.pt
+*.task
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.zip
+
+# Python
+.venv
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Frontend build products
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Machine-specific and private configuration
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+work/
