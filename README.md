@@ -144,8 +144,7 @@ The server is intended for a **single local workstation** and binds to loopback.
 # Third-Party Notices
 
 This project uses and/or downloads third-party model weights and libraries. The respective code and model weights are subject to their own licenses.
-
-## RTMPose and YOLOX Models
+** RTMPose and YOLOX Models
 The RTMPose-M and YOLOX-M model checkpoints downloaded and used by this application are provided by the [OpenMMLab](https://github.com/open-mmlab) and [RTMLib](https://github.com/Tau-J/rtmlib) projects. 
 
 These models and their associated source code are generally licensed under the **Apache License 2.0**. 
@@ -154,7 +153,7 @@ These models and their associated source code are generally licensed under the *
 
 By using the automated downloader script in this project, you are retrieving these weights from their respective release channels. Ensure you comply with the Apache 2.0 license terms if you intend to redistribute these weights.
 
-MIT License
+# License
 
 Copyright (c) 2026 Dilip Goswami
 
