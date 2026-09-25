@@ -77,6 +77,11 @@ async def local_origin(request, call_next):
     from urllib.parse import urlparse
 
     origin = request.headers.get("origin")
+    # Validate Host as well as Origin: blocks DNS-rebinding pages that make
+    # same-origin requests (which carry no Origin header) to this server.
+    host = urlparse(f"//{request.headers.get('host', '')}").hostname
+    if host not in ["localhost", "127.0.0.1", "::1", "testserver"]:
+        return JSONResponse({"detail": "Local access only."}, status_code=403)
     if origin and urlparse(origin).hostname not in ["localhost", "127.0.0.1", "::1"]:
         return JSONResponse(
             {"detail": "This workstation accepts local browser requests only."},
@@ -968,6 +973,19 @@ async def restore_project_data(request: Request):
             shutil.rmtree(folder)
             raise
 
+
+# Real-time multi-camera 2D/3D pipeline (desktop app UI at /live/).
+from fastapi.responses import RedirectResponse  # noqa: E402
+
+from .realtime.server import create_app as create_live_app  # noqa: E402
+
+
+@app.get("/live", include_in_schema=False)
+def live_redirect():
+    return RedirectResponse("/live/")
+
+
+app.mount("/live", create_live_app(desktop=os.getenv("MOCAP_DESKTOP") == "1"))
 
 # The production build is served by this same local backend; no desktop framework.
 DIST = ROOT / "frontend" / "dist"

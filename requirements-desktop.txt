@@ -1,0 +1,3 @@
+# Native desktop window for the real-time app (WKWebView on macOS).
+# Optional: without it the app opens in a Chrome/Edge app window or browser.
+pywebview>=5.3,<7

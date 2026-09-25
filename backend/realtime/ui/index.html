@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mocap Studio Live</title>
+    <link rel="stylesheet" href="static/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="6" r="3.2" />
+          <path d="M16 10v9M16 12l-7 5M16 12l7 5M16 19l-5 9M16 19l5 9" />
+        </svg>
+        <span>Mocap Studio <b>Live</b></span>
+      </div>
+      <div class="chips">
+        <span class="chip" id="chip-accel" title="Inference hardware">…</span>
+        <span class="chip" id="chip-run">Idle</span>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <section class="panel">
+          <h2><span class="step">1</span>Calibration</h2>
+          <p class="hint">Multi-camera calibration JSON or NPZ (from the calibration builder).</p>
+          <div class="filepick">
+            <button class="btn" id="pick-cal">Choose calibration…</button>
+            <span class="file" id="cal-name">None selected</span>
+          </div>
+          <div class="calinfo" id="cal-info"></div>
+        </section>
+
+        <section class="panel">
+          <h2><span class="step">2</span>Camera videos</h2>
+          <p class="hint">One synchronised video per camera, recorded at the same frame rate.</p>
+          <div id="camera-list" class="camera-list">
+            <div class="empty">Choose a calibration first.</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2><span class="step">3</span>Accuracy</h2>
+          <label class="field">
+            <span>Pose model</span>
+            <select id="preset"></select>
+          </label>
+          <div class="model-status" id="model-status"></div>
+          <label class="toggle">
+            <input type="checkbox" id="flip" />
+            <span>
+              Flip test-time augmentation
+              <small>Averages a mirrored pass. More accurate, about 2× compute.</small>
+            </span>
+          </label>
+          <label class="field">
+            <span>Motion responsiveness <output id="smooth-out">1.00×</output></span>
+            <input type="range" id="smoothing" min="-2" max="2" step="0.1" value="0" />
+            <small class="range-labels"><span>smoother</span><span>more responsive</span></small>
+          </label>
+          <details class="advanced">
+            <summary>Advanced</summary>
+            <label class="field inline">
+              <span>Min. keypoint confidence</span>
+              <input type="number" id="min-score" min="0.05" max="0.95" step="0.05" value="0.3" />
+            </label>
+            <label class="field inline">
+              <span>Detector check every (frames)</span>
+              <input type="number" id="det-interval" min="1" max="600" step="1" value="30" />
+            </label>
+            <label class="field inline">
+              <span>Preview width (px, 0 = auto)</span>
+              <input type="number" id="preview-width" min="0" max="1920" step="40" value="0" />
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="live-bones" checked />
+              <span>Stabilise limb lengths in live view</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="pace" />
+              <span>
+                Simulate live camera timing
+                <small>Feed frames at the recording's speed (latency test).</small>
+              </span>
+            </label>
+          </details>
+        </section>
+
+        <section class="panel actions">
+          <input id="run-name" class="text" placeholder="Capture name" value="capture" />
+          <button class="btn primary big" id="start" disabled>Start processing</button>
+          <button class="btn danger big hidden" id="stop">Stop</button>
+          <div class="error" id="setup-error" role="alert"></div>
+        </section>
+
+        <section class="panel" id="save-panel">
+          <h2><span class="step">4</span>Save to this computer</h2>
+          <div class="filepick">
+            <input id="save-folder" class="text" />
+            <button class="btn" id="pick-folder">Browse…</button>
+          </div>
+          <label class="toggle"><input type="checkbox" id="opt-csv" checked /><span>CSV tables (3D + per-camera 2D)</span></label>
+          <label class="toggle"><input type="checkbox" id="opt-trc" checked /><span>TRC markers (OpenSim, Blender)</span></label>
+          <label class="toggle"><input type="checkbox" id="opt-videos" /><span>Overlay videos per camera (MP4)</span></label>
+          <label class="toggle"><input type="checkbox" id="opt-bones" /><span>Enforce constant bone lengths</span></label>
+          <button class="btn primary" id="save" disabled>Save results</button>
+          <div class="save-status" id="save-status"></div>
+        </section>
+      </aside>
+
+      <main class="stage">
+        <div class="viewport">
+          <div class="cams" id="cams">
+            <div class="cams-empty">
+              <svg viewBox="0 0 48 32" aria-hidden="true"><rect x="2" y="6" width="30" height="22" rx="4" /><path d="M32 13l12-6v18l-12-6z" /></svg>
+              <span>Camera views with live 2D skeletons appear here</span>
+            </div>
+          </div>
+          <div class="view3d">
+            <canvas id="view3d"></canvas>
+            <div class="view3d-bar">
+              <span class="label">3D</span>
+              <label><input type="checkbox" id="follow" checked /> Follow</label>
+              <button class="icon" id="reset-view" title="Reset view">⟲</button>
+            </div>
+            <div class="legend">
+              <span><i class="dot good"></i>&lt;15 mm</span>
+              <span><i class="dot ok"></i>&lt;40 mm</span>
+              <span><i class="dot poor"></i>uncertain</span>
+            </div>
+            <div class="welcome" id="welcome">
+              <h1>Real-time multi-camera motion capture</h1>
+              <ol>
+                <li>Choose your camera calibration.</li>
+                <li>Pick one synchronised video per camera.</li>
+                <li>Start. 2D skeletons and the 3D pose stream in as frames are processed.</li>
+                <li>When finished, the full recording is smoothed with past <em>and</em> future frames. Replay it, then save to your computer.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <footer class="transport">
+          <div class="progress">
+            <div class="bar"><div class="processed" id="bar-processed"></div><div class="played" id="bar-played"></div></div>
+            <div class="times"><span id="time-now">0:00.00</span><span id="time-total">—</span></div>
+          </div>
+          <div class="controls">
+            <button class="btn" id="play" disabled>Pause</button>
+            <select id="mode" title="Playback">
+              <option value="smooth">Smooth playback</option>
+              <option value="edge">Follow live edge</option>
+            </select>
+            <button class="btn" id="replay" disabled title="Replay the final smoothed result">Replay smoothed</button>
+            <label class="toggle compact"><input type="checkbox" id="show-2d" checked /><span>2D detections</span></label>
+            <label class="toggle compact"><input type="checkbox" id="show-reproj" checked /><span>3D reprojection</span></label>
+          </div>
+          <div class="metrics" id="metrics">
+            <div><b id="m-fps">—</b><span>processing fps</span></div>
+            <div><b id="m-rt">—</b><span>× real time</span></div>
+            <div><b id="m-play">—</b><span>playback speed</span></div>
+            <div><b id="m-lat">—</b><span>latency</span></div>
+            <div><b id="m-buf">—</b><span>buffered</span></div>
+            <div><b id="m-cov">—</b><span>3D coverage</span></div>
+            <div><b id="m-rep">—</b><span>reprojection</span></div>
+            <div><b id="m-lr">—</b><span>L/R repairs</span></div>
+          </div>
+        </footer>
+      </main>
+    </div>
+    <script type="module" src="static/app.js"></script>
+  </body>
+</html>

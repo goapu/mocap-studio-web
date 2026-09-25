@@ -51,7 +51,31 @@ def setup(skip_models=False):
     run([npm, "--prefix", "frontend", "run", "build"])
     if not skip_models:
         run([PYTHON, "scripts/download_models.py"])
-    print("\nSetup complete. Start with: python3 scripts/manage.py start")
+    install_desktop(required=False)
+    if sys.platform == "darwin":
+        run([PYTHON, "scripts/build_macos_app.py"])
+    print(
+        "\nSetup complete.\n"
+        "  Real-time desktop app:  python3 scripts/manage.py desktop"
+        + (
+            "   (or double-click dist/Mocap Studio.app)"
+            if sys.platform == "darwin"
+            else ""
+        )
+        + "\n  Offline review tool:    python3 scripts/manage.py start"
+    )
+
+
+def install_desktop(required=True):
+    """Install the native window toolkit (pywebview)."""
+    try:
+        run([PYTHON, "-m", "pip", "install", "-r", "requirements-desktop.txt"])
+    except subprocess.CalledProcessError:
+        if required:
+            raise
+        print(
+            "Warning: pywebview could not be installed; the app will open in a browser window."
+        )
 
 
 def doctor():
@@ -76,6 +100,37 @@ def doctor():
             "Runtime dependencies",
             result.returncode == 0,
             result.stdout.strip() or result.stderr.strip(),
+        )
+        result = subprocess.run(
+            [
+                str(PYTHON),
+                "-c",
+                "import onnxruntime as o; p=o.get_available_providers(); "
+                "gpu=[x for x in p if x in ('CoreMLExecutionProvider','CUDAExecutionProvider','DmlExecutionProvider')]; "
+                "print(', '.join(gpu) if gpu else 'CPU only'); raise SystemExit(0 if gpu else 3)",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        # Informational: CPU-only machines still work, just slower.
+        print(
+            f"{'OK' if result.returncode == 0 else 'WARN'}  GPU inference provider: "
+            f"{result.stdout.strip() or result.stderr.strip()}"
+        )
+        result = subprocess.run(
+            [
+                str(PYTHON),
+                "-c",
+                "import webview; print('pywebview', webview.__version__ if hasattr(webview, '__version__') else '')",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        check(
+            "Native desktop window",
+            result.returncode == 0,
+            result.stdout.strip()
+            or "pywebview missing: python3 scripts/manage.py install-desktop",
         )
         result = subprocess.run(
             [str(PYTHON), "-m", "pip", "check"], capture_output=True, text=True
@@ -137,6 +192,23 @@ def main():
     commands.add_parser(
         "test", help="Run backend tests and frontend format/build checks"
     )
+    desk = commands.add_parser(
+        "desktop", help="Open the real-time multi-camera desktop app"
+    )
+    desk.add_argument("--browser", action="store_true", help="Use a browser window")
+    desk.add_argument("--port", type=int, default=8765)
+    commands.add_parser("install-desktop", help="Install the native window (pywebview)")
+    app_cmd = commands.add_parser(
+        "build-app", help="Create dist/Mocap Studio.app (macOS)"
+    )
+    app_cmd.add_argument(
+        "--install", action="store_true", help="Copy to ~/Applications"
+    )
+    bench = commands.add_parser(
+        "benchmark", help="Measure 3D/temporal accuracy on synthetic running"
+    )
+    bench.add_argument("--cams", type=int, default=4)
+    bench.add_argument("--fps", type=float, default=60)
     args = parser.parse_args()
     try:
         if args.command == "setup":
@@ -164,6 +236,34 @@ def main():
                     "127.0.0.1",
                     "--port",
                     str(args.port),
+                ]
+            )
+        elif args.command == "desktop":
+            require_python()
+            extra = ["--browser"] if args.browser else []
+            run([PYTHON, "-m", "desktop.launch", "--port", str(args.port), *extra])
+        elif args.command == "install-desktop":
+            require_python()
+            install_desktop()
+        elif args.command == "build-app":
+            require_python()
+            run(
+                [
+                    PYTHON,
+                    "scripts/build_macos_app.py",
+                    *(["--install"] if args.install else []),
+                ]
+            )
+        elif args.command == "benchmark":
+            require_python()
+            run(
+                [
+                    PYTHON,
+                    "scripts/benchmark_accuracy.py",
+                    "--cams",
+                    str(args.cams),
+                    "--fps",
+                    str(args.fps),
                 ]
             )
         elif args.command == "test":

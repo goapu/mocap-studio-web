@@ -10,8 +10,8 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: pip install -r requirements-dev.txt
-      - run: ruff check backend scripts tests
-      - run: ruff format --check backend scripts tests
+      - run: ruff check backend scripts tests desktop
+      - run: ruff format --check backend scripts tests desktop
       - run: python -m pytest
   frontend:
     runs-on: ubuntu-latest

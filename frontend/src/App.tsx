@@ -25,6 +25,9 @@ import {
   Crosshair,
   AlertCircle,
   SlidersHorizontal,
+  ArrowRight,
+  BadgeCheck,
+  CircleHelp,
 } from "lucide-react";
 import type { Session, Summary, Job, Calibration } from "./types";
 import { api, json, jointLabel } from "./types";
@@ -647,13 +650,16 @@ export default function App() {
           <div className="heading-row">
             <div>
               <div className="eyebrow">RECONSTRUCT / REVIEW / REFINE</div>
-              <h1>Motion, in alignment.</h1>
-              <p>Inspect every view. Refine the joints. Reconstruct in 3D.</p>
+              <h1>Review motion with confidence.</h1>
+              <p>
+                Bring synchronized views together, correct what matters, and
+                export a traceable 3D result.
+              </p>
             </div>
             <div className="heading-actions">
               <button onClick={() => setImportOpen(true)} disabled={disabled}>
                 <Upload size={16} />
-                Import capture
+                Import synchronized capture
               </button>
               <button
                 className="primary"
@@ -666,7 +672,7 @@ export default function App() {
                 }
               >
                 <ScanLine size={17} />
-                Run pose estimation
+                Run pose analysis
               </button>
             </div>
           </div>
@@ -769,29 +775,87 @@ export default function App() {
           ) : (
             <>
               {session.source === "synthetic" && (
-                <div className="demo-banner">
-                  <span className="demo-badge">DEMO</span>
-                  <span>
-                    Synthetic reach sequence. The right wrist in cam2 is
-                    deliberately misaligned on frames 10–31.
-                  </span>
-                  <button
-                    disabled={navigationLocked}
-                    onClick={() => {
-                      setPlaying(false);
-                      setIndex(20);
-                      setSelected(10);
-                      setCameraB("cam2");
-                    }}
+                <>
+                  <section
+                    className="operator-journey"
+                    aria-label="Getting started"
                   >
-                    Inspect frame 20 <ChevronRight size={14} />
-                  </button>
-                </div>
+                    <div className="journey-intro">
+                      <span className="journey-kicker">
+                        <CircleHelp size={15} /> Guided start
+                      </span>
+                      <strong>From cameras to a reliable 3D export</strong>
+                      <p>
+                        Start with a measured camera rig, then import the
+                        synchronized footage you want to review.
+                      </p>
+                    </div>
+                    <button
+                      className="journey-step"
+                      onClick={() => setCalibrateOpen(true)}
+                      disabled={disabled}
+                    >
+                      <span className="journey-number">1</span>
+                      <span>
+                        <b>Calibrate the rig</b>
+                        <small>Use 12+ synchronized chessboard views</small>
+                      </span>
+                      <ArrowRight size={16} />
+                    </button>
+                    <button
+                      className="journey-step"
+                      onClick={() => setImportOpen(true)}
+                      disabled={disabled}
+                    >
+                      <span className="journey-number">2</span>
+                      <span>
+                        <b>Import a capture</b>
+                        <small>2–6 matched videos or image sequences</small>
+                      </span>
+                      <ArrowRight size={16} />
+                    </button>
+                    <button
+                      className="journey-step demo-step"
+                      disabled={navigationLocked}
+                      onClick={() => {
+                        setPlaying(false);
+                        setIndex(20);
+                        setSelected(10);
+                        setCameraB("cam2");
+                      }}
+                    >
+                      <span className="journey-number">3</span>
+                      <span>
+                        <b>Practice a correction</b>
+                        <small>Open the included synthetic reference</small>
+                      </span>
+                      <ArrowRight size={16} />
+                    </button>
+                  </section>
+                  <div className="demo-banner">
+                    <span className="demo-badge">REFERENCE DEMO</span>
+                    <span>
+                      The right wrist in cam2 is intentionally offset on frames
+                      10–31. Use it to learn the correction workflow.
+                    </span>
+                    <button
+                      disabled={navigationLocked}
+                      onClick={() => {
+                        setPlaying(false);
+                        setIndex(20);
+                        setSelected(10);
+                        setCameraB("cam2");
+                      }}
+                    >
+                      Open frame 20 <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </>
               )}
               <div className="workspace-toolbar">
                 <div className="view-label">
                   <Grid2X2 size={16} />
-                  <strong>Multi-view reconstruction</strong>
+                  <strong>Multi-view review</strong>
                   <span className="subtle">
                     {names.length} calibrated cameras
                   </span>
@@ -878,7 +942,7 @@ export default function App() {
                   <header>
                     <div className="panel-title">
                       <Box size={16} />
-                      3D skeleton
+                      Reconstructed 3D pose
                     </div>
                     <span className="live-tag">
                       {frame.quality.valid}/17 joints
@@ -946,7 +1010,8 @@ export default function App() {
                   Undo
                 </button>
                 <span className="edit-hint">
-                  Drag a joint to correct its position. 3D updates on release.
+                  Drag a joint in either camera view. The 3D pose refreshes when
+                  you release it.
                 </span>
               </div>
               <div className="bottom-grid">
@@ -1133,10 +1198,58 @@ export default function App() {
                   )}
                 </section>
               </div>
+              <section
+                className="deliverables"
+                aria-label="Session deliverables"
+              >
+                <div className="deliverables-heading">
+                  <span className="deliverables-icon">
+                    <BadgeCheck size={19} />
+                  </span>
+                  <div>
+                    <span className="eyebrow">SESSION DELIVERABLES</span>
+                    <h2>Export a result you can review later.</h2>
+                    <p>
+                      This session contains {session.frames.length} timestamped
+                      frames, {editedCount} manual correction
+                      {editedCount === 1 ? "" : "s"}, and its calibration.
+                    </p>
+                  </div>
+                </div>
+                <div className="deliverable-actions">
+                  <a
+                    className="deliverable-card"
+                    href={`/api/sessions/${session.id}/project`}
+                  >
+                    <Layers size={20} />
+                    <span>
+                      <b>Project backup</b>
+                      <small>
+                        Images, calibration, predictions, and labels
+                      </small>
+                    </span>
+                    <Download size={16} />
+                  </a>
+                  <a
+                    className="deliverable-card export-card"
+                    href={`/api/sessions/${session.id}/export`}
+                  >
+                    <Download size={20} />
+                    <span>
+                      <b>3D motion JSON</b>
+                      <small>
+                        Metric joints, timestamps, and quality evidence
+                      </small>
+                    </span>
+                    <ArrowRight size={16} />
+                  </a>
+                </div>
+              </section>
               <div className="workspace-footer">
                 <span>
                   <Check size={14} />
-                  Manual labels persist across detection runs.
+                  Your corrections are saved locally and retained when analysis
+                  reruns.
                 </span>
                 <div>
                   <button
@@ -1153,14 +1266,14 @@ export default function App() {
                     href={`/api/sessions/${session.id}/project`}
                   >
                     <Layers size={15} />
-                    Save project ZIP
+                    Backup
                   </a>
                   <a
                     className="button primary"
                     href={`/api/sessions/${session.id}/export`}
                   >
                     <Download size={16} />
-                    Export 3D motion
+                    Export motion
                   </a>
                 </div>
               </div>
