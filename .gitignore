@@ -33,3 +33,8 @@ frontend/dist/
 .DS_Store
 *.log
 work/
+
+# Desktop app bundle
+dist/
+# Documentation media (demo recordings) are intentionally tracked
+!docs/media/*.mp4

@@ -1,21 +1,66 @@
 # Mocap Studio Web
 
-**A local workstation for reviewing synchronized camera footage and producing traceable 3D motion.**
+**Local multi-camera motion capture: real-time 2D + metric 3D pose estimation, and a workstation for reviewing and correcting it.**
 
-Mocap Studio combines multi-camera pose analysis, calibrated 3D reconstruction, and operator correction in one browser workspace. Your footage, model inference, annotations, and saved sessions remain on the workstation; no cloud account or desktop application is required.
+Mocap Studio turns synchronized videos from 2–6 calibrated cameras into traceable 3D motion. Footage, model inference and results stay on your computer; no cloud account is required. The repository contains two applications that share one local engine:
 
-## What you can do
+| | Real-time desktop app | Review workstation |
+| --- | --- | --- |
+| Purpose | Process whole takes fast and watch 2D + 3D pose live | Inspect and hand-correct individual frames |
+| Temporal model | Kalman filter live, full-take RTS smoothing when saved | None (evidence-only, per-frame) |
+| Inference | GPU (Apple CoreML / CUDA / DirectML) or CPU, auto-selected | CPU |
+| Start | `python3 scripts/manage.py desktop` | `python3 scripts/manage.py start` |
 
-- Import 2–6 synchronized videos or numbered image sequences.
-- Calibrate a camera rig from chessboard captures or import an existing JSON/NPZ calibration.
-- Run RTMPose-M body landmark analysis and explicitly match people across camera views.
-- Review the reconstructed 3D skeleton, correct joints directly in each camera view, and see the result update immediately.
-- Preserve corrections through re-analysis, recover interrupted work, and resume from unfinished frames.
-- Save a portable project backup or export timestamped, metric 3D motion JSON with quality evidence.
+## Real-time desktop app
 
-The bundled reference sequence is a safe place to learn the correction workflow before importing a real capture.
+![Mocap Studio Live demo: four camera views with live 2D skeletons and the 3D skeleton](docs/media/realtime-demo.gif)
 
-## Run it in three commands
+*Demo ([MP4, 42 s](docs/media/realtime-demo.mp4)): a synthetic 4-camera test rig in which a public-domain photo of a person moves quickly on a known 3D plane, processed end to end by the real app: setup, live 2D + 3D processing, replay of the smoothed result, saving to disk. It was recorded on a 2-core cloud CPU without GPU while also screen-recording, so the processing segment is shown 8× faster (about 1 frame/s under recording load; about 4 frames/s without it). GPU runs (Apple Silicon with CoreML, CUDA) are expected to be much faster but have not been measured yet. The "processing fps" and "× real time" tiles report it live.*
+
+Choose a calibration and one synchronized video per camera, press **Start**, and the app streams every processed frame: each camera view with its 2D skeleton and the 3D skeleton in an orbitable viewer. When the take is finished, it is re-smoothed using past *and* future frames; replay the final result and save it to your computer.
+
+### Start
+
+```bash
+python3 scripts/manage.py setup      # once: dependencies, models, native window, macOS app bundle
+python3 scripts/manage.py desktop    # or double-click dist/Mocap Studio.app on macOS
+```
+
+`python3 scripts/manage.py build-app --install` copies the app to `~/Applications`. Without the optional `pywebview` package the app opens in a Chrome/Edge app window or the default browser (`desktop --browser` forces this).
+
+### What makes it fast and accurate
+
+- **GPU inference with automatic fallback.** Each network is benchmarked on CoreML / CUDA / DirectML and on the CPU when it loads; the faster one is used. All cameras are batched into one pose-network call per frame.
+- **Tracking instead of detecting every frame.** Each camera follows the actor with the previous keypoints, extrapolated by their velocity and padded for fast motion such as sprinting. The person detector runs asynchronously on a staggered schedule and immediately when a track is lost, so it never stalls the frame loop.
+- **Every frame is processed.** No frame skipping; higher capture frame rates directly improve the temporal model.
+- **Robust multi-view geometry.** All joints are solved together (weighted DLT + Gauss–Newton on pixel error). A disagreeing camera is dropped for that joint instead of losing the joint, and each joint gets a 3×3 covariance so narrow-angle depth is trusted less. Left/right confusions (common for legs while running) are repaired per camera against the predicted 3D pose.
+- **Temporal model.** A constant-acceleration Kalman filter per joint with outlier gating drives the live view; a Rauch–Tung–Striebel smoother over the whole take produces the saved result. Optional flip test-time augmentation, sub-pixel keypoint decoding, and a choice of models up to RTMPose-X 384×288 with feet (Halpe-26).
+- **No playback stalls.** Decoding prefetches on one thread per camera; the UI keeps an adaptive jitter buffer and slows playback smoothly if processing is slower than real time (or follows the live edge on request).
+
+### Accuracy evidence
+
+`python3 scripts/manage.py benchmark --cams 4 --fps 60` reproduces the table below. The ground truth is a synthetic runner; 2D errors follow a deliberately pessimistic detector model (σ = 2.5 px noise, 3 % gross outliers, 3 % dropouts, bursts of left/right leg swaps).
+
+| 4 cameras, 60 fps | 3D coverage | Mean error | p95 | Jitter | Solve time / frame |
+| --- | --- | --- | --- | --- | --- |
+| Earlier per-frame solver | 91.8 % | 8.8 mm | 16.8 mm | 26.4 mm | ~650 ms |
+| Real-time triangulation | 100 % | 9.2 mm | 16.3 mm | 37.4 mm | ~3 ms |
+| + live Kalman filter (displayed) | 100 % | 7.0 mm | 13.0 mm | 13.1 mm | |
+| + full-take smoothing (saved) | 100 % | **3.7 mm** | **7.1 mm** | **2.4 mm** | |
+
+This validates the geometry and temporal model against a known error model. It does not measure the 2D network on real people; real footage adds model bias, synchronization and calibration error. Validate against a reference (markers or known segment lengths) before quoting accuracy for a rig. Throughput depends on the machine, camera count and model preset and is shown live in the app.
+
+### Outputs (saved to a folder you choose)
+
+`pose3d.json` (smoothed, raw and live 3D, per-joint uncertainty, per-camera 2D keypoints and reprojections, calibration, quality report) · `pose3d.csv` · `pose2d_<camera>.csv` · `pose3d.trc` (Y-up millimetres for OpenSim / Blender) · optional `<camera>_overlay.mp4` · `report.json`.
+
+### Current limits
+
+One tracked actor; videos must already be synchronized at a constant frame rate; file input only (live camera capture is not yet included); joint positions only (no joint rotations or BVH/FBX retargeting yet). See [docs/REALTIME.md](docs/REALTIME.md) for details.
+
+## Offline review workstation
+
+### Run it in three commands
 
 From the repository root:
 
@@ -52,7 +97,7 @@ Model downloads are needed once and cached under `.local/models/` by default. Th
 
 The UI and the API share the same local server. Keep the terminal running while using the application. There is no automatic startup service.
 
-### Development
+#### Development
 
 Use two terminals with the virtual environment active:
 
@@ -71,11 +116,11 @@ python3 scripts/manage.py test
 
 # Optional contributor lint/format checks
 python -m pip install -r requirements-dev.txt
-ruff check backend scripts tests
-ruff format --check backend scripts tests
+ruff check backend scripts tests desktop
+ruff format --check backend scripts tests desktop
 ```
 
-## Your first capture
+### Your first capture
 
 1. **Calibrate the rig.** In Camera calibration, provide at least 12 synchronized chessboard images for every camera. Use the measured square size in meters. The application accepts a calibration only after intrinsic fit, stereo fit, and board-pose diversity checks pass.
 2. **Import synchronized media.** Select one video or a numbered image sequence for each camera and attach the corresponding calibration. Every video must have matching constant FPS and frame-zero alignment; every image must use the calibration resolution.
@@ -85,7 +130,7 @@ ruff format --check backend scripts tests
 
 For a guided dry run, open the included synthetic demo and use frame 20 to correct the deliberately offset right wrist in cam2.
 
-### Capture requirements
+#### Capture requirements
 
 - Videos must be synchronized, constant-FPS, and aligned at frame zero. This release does not measure or repair synchronization. Variable-frame-rate videos should be converted to constant FPS first.
 - All video cameras in a session must report matching FPS. Camera image resolution must match that camera's calibration exactly.
@@ -94,11 +139,11 @@ For a guided dry run, open the included synthetic demo and use frame 20 to corre
 - The chessboard builder currently requires equal image dimensions across cameras. Imported calibrated cameras may have different resolutions.
 - Keep one intended actor in the capture volume when possible. Multiple-person selections are per frame and require operator review.
 
-## Data and accuracy boundaries
+### Data and accuracy boundaries
 
-This MVP delivers the complete local operator workflow. It is not yet a metrologically validated capture system. Real RTMPose 2D inference was verified on a public image; real synchronized multi-camera human capture accuracy has not yet been benchmarked.
+The review workstation delivers the complete local operator workflow. It is not yet a metrologically validated capture system. Real RTMPose 2D inference was verified on a public image; real synchronized multi-camera human capture accuracy has not yet been benchmarked.
 
-3D positions use calibrated multi-view geometry, not an inferred single-camera body shape. A joint needs at least two usable views. Missing joints stay `null`; there is no automatic gap filling, motion smoothing, bone-length enforcement, or foot locking. This preserves evidence and avoids introducing the timing/contact defects found in the original scripts.
+3D positions use calibrated multi-view geometry, not an inferred single-camera body shape. A joint needs at least two usable views. In the review workstation, missing joints stay `null`; there is no automatic gap filling, motion smoothing, bone-length enforcement, or foot locking. (The real-time app above adds an explicit, reported temporal model.) This preserves evidence and avoids introducing the timing/contact defects found in the original scripts.
 
 Reprojection error measures consistency with image observations. It does not certify depth accuracy, actor identity, synchronization, anatomical correctness, or calibration coverage. Inspect accepted/excluded views as well as the rendered skeleton.
 
@@ -109,25 +154,30 @@ The 3D grid is a reference aid. With `world_frame: camera`, its height follows t
 ## Repository layout
 
 ```text
-backend/                  FastAPI routes, calibration, geometry, model adapter, storage
-frontend/src/             Typed React editor, camera interaction, Three.js viewer
-tests/                    Geometry and workflow regression tests
-scripts/                  Setup/start/doctor, model downloader, inference smoke check
-docs/                     Architecture, calibration format, validation evidence
+backend/                  Review workstation: FastAPI routes, calibration, geometry, model adapter, storage
+backend/realtime/         Real-time engine: ONNX models, tracking, triangulation, temporal model, export, API
+backend/realtime/ui/      Desktop UI (vanilla JS, three.js vendored; no build step)
+desktop/launch.py         Desktop launcher (native window via pywebview, browser fallback)
+frontend/src/             Review workstation UI: typed React editor, camera interaction, Three.js viewer
+tests/                    Geometry, workflow and real-time pipeline regression tests
+scripts/                  Setup/start/doctor/desktop, model downloader, benchmark, macOS app builder
+docs/                     Architecture, calibration format, validation evidence, real-time app guide
 examples/                 Calibration schema example (not a real rig calibration)
-.github/workflows/ci.yml   Backend/frontend tests, lint, formatting and build
+.github/workflows/ci.yml  Backend/frontend tests, lint, formatting and build
 requirements.txt          Direct dependency versions
 requirements.lock.txt     Tested complete Python dependency set
+requirements-desktop.txt  Optional native window (pywebview)
 requirements-dev.txt      Contributor lint dependency
 frontend/package-lock.json
 .local/                   Ignored recordings, saved sessions, model weights
+dist/                     Ignored locally built "Mocap Studio.app"
 ```
 
-The original desktop source is preserved outside this new repository. This implementation uses one reconstruction backend for import, inference, edits, quality reporting, and export.
+Both applications share one local server: the review workstation at `/` and the real-time app at `/live/`. Recordings, model binaries, environments, caches, exports and generated builds are ignored by Git.
 
-The public repository is available at [goapu/mocap-studio-web](https://github.com/goapu/mocap-studio-web). Recordings, model binaries, environments, caches, and generated builds are ignored. Review the source and choose your project's license before distributing a derivative release.
+## Documentation
 
-## Release evidence and operation
+- [Real-time desktop app: workflow, pipeline, accuracy benchmark, outputs](docs/REALTIME.md)
 
 - [MVP scope and acceptance criteria](docs/MVP_ACCEPTANCE.md)
 - [Validation results](docs/VALIDATION.md)
@@ -137,9 +187,17 @@ The public repository is available at [goapu/mocap-studio-web](https://github.co
 
 ## Configuration
 
-`MOCAP_DATA_DIR` and `MOCAP_MODEL_DIR` optionally relocate session and model storage. `MOCAP_PYTHON` optionally selects an existing environment for the launcher. Set overrides as environment variables; `.env.example` documents them but is not loaded automatically.
+| Variable | Purpose |
+| --- | --- |
+| `MOCAP_DATA_DIR` | Review-workstation session storage (default `.local/sessions`) |
+| `MOCAP_MODEL_DIR` | Model weights (default `.local/models`) |
+| `MOCAP_EXPORT_DIR` | Default save folder of the real-time app (default `~/Documents/MocapStudio/Exports`) |
+| `MOCAP_PORT` | Preferred port of the desktop launcher (default 8765; a free port is chosen if busy) |
+| `MOCAP_PYTHON` | Existing Python environment for the launchers |
 
-The server is intended for a **single local workstation** and binds to loopback. It rejects browser requests with nonlocal origins. It has no authentication, multi-user isolation, remote deployment configuration, or public hosting setup.
+Set overrides as environment variables; `.env.example` documents them but is not loaded automatically.
+
+The server is intended for a **single local workstation** and binds to loopback. It rejects requests whose `Host` or `Origin` is not local (protection against cross-site requests and DNS rebinding). It has no authentication, multi-user isolation, remote deployment configuration, or public hosting setup.
 
 # Third-Party Notices
 
@@ -152,6 +210,8 @@ These models and their associated source code are generally licensed under the *
 - RTMLib: [https://github.com/Tau-J/rtmlib/blob/main/LICENSE](https://github.com/Tau-J/rtmlib/blob/main/LICENSE)
 
 By using the automated downloader script in this project, you are retrieving these weights from their respective release channels. Ensure you comply with the Apache 2.0 license terms if you intend to redistribute these weights.
+
+The real-time app can also download the optional RTMPose-X (384×288) and Halpe-26 (body + feet) checkpoints from the same OpenMMLab release channel on request. It vendors [three.js](https://github.com/mrdoob/three.js) r180 (MIT, see `backend/realtime/ui/vendor/THREE_LICENSE.txt`) and uses [pywebview](https://github.com/r0x0r/pywebview) (BSD-3-Clause) for the native window when installed. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 # License
 

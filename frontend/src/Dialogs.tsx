@@ -85,9 +85,16 @@ export function ImportDialog({
     >
       <form onSubmit={submit}>
         <p className="dialog-intro">
-          Add a video or numbered images for each camera. Use aligned start
-          times, matching video FPS, and the resolution used for calibration.
+          Add one synchronized source for each camera. Use aligned start times,
+          matching video FPS, and the same image resolution used for
+          calibration.
         </p>
+        <div className="dialog-checklist">
+          <strong>Before importing</strong>
+          <span>Same moment in every view</span>
+          <span>Constant FPS for video</span>
+          <span>Calibration matches resolution</span>
+        </div>
         <label className="field">
           Session name
           <input
@@ -188,8 +195,9 @@ export function ImportDialog({
         </div>
         <p className="help">
           Videos use their recorded FPS. Frame stride samples every Nth video
-          frame while preserving timestamps. Maximum 300 sampled frames and 500
-          MB. Images need shared numbers, such as frame001.jpg.
+          frame while preserving source time. Images need shared frame numbers,
+          such as frame001.jpg. The current workspace supports up to 300 sampled
+          frames and 500 MB per upload.
         </p>
         {error && (
           <p role="alert" className="error">
@@ -256,10 +264,16 @@ export function CalibrationDialog({
     >
       <form onSubmit={submit}>
         <p className="dialog-intro">
-          Use a chessboard captured simultaneously by every camera. Add at least
-          12 matching, numbered images per camera with varied board angles and
-          positions.
+          Use a chessboard visible in every camera at the same instant. Add at
+          least 12 matching, numbered images per camera with varied board
+          angles, distances, and positions.
         </p>
+        <div className="dialog-checklist">
+          <strong>For a dependable calibration</strong>
+          <span>Keep the full board visible</span>
+          <span>Vary tilt and distance</span>
+          <span>Use the real square size</span>
+        </div>
         <div className="field-row">
           <label className="field">
             Inner columns
@@ -332,9 +346,9 @@ export function CalibrationDialog({
           </button>
         )}
         <p className="help">
-          Calibration is accepted only when stereo RMS is at most 1.5 px. This
-          verifies the board fit; it does not by itself certify body-pose
-          accuracy.
+          Calibration is accepted only when the camera fit passes intrinsic,
+          stereo, and board-diversity checks. This confirms the board fit; it
+          does not by itself certify body-pose accuracy.
         </p>
         {error && (
           <p className="error" role="alert">

@@ -15,3 +15,10 @@ The package manager records dependency versions and distributes dependency licen
 The public RTMLib `demo.jpg` was downloaded only into the separate local testing directory for an inference smoke test. It is not included in this repository or presented as captured multi-camera data. The in-app synthetic images are generated from calibrated geometric fixtures and are labelled synthetic.
 
 The license for the newly authored application source has not been selected on the repository owner's behalf.
+
+## Real-time desktop app
+
+- [three.js](https://github.com/mrdoob/three.js) r180 is vendored in `backend/realtime/ui/vendor/` under the MIT license (`THREE_LICENSE.txt`).
+- [pywebview](https://github.com/r0x0r/pywebview) (BSD-3-Clause) provides the native window when installed from `requirements-desktop.txt`.
+- The optional RTMPose-X and Halpe-26 (feet) checkpoints are downloaded from OpenMMLab on request. Review their training-data terms before commercial use.
+- The demo in `docs/media/` shows the public-domain NASA astronaut portrait distributed with scikit-image (`skimage.data.astronaut`), mapped onto a synthetic moving plane.
