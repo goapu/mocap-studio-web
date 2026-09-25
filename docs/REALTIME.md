@@ -5,17 +5,23 @@ shows the 2D skeleton in every view and the metric 3D skeleton while it works.
 When processing finishes, it smooths the whole recording using both earlier and
 later frames. You can replay that result and save it to your computer.
 
-![Demo](media/realtime-demo.gif)
+![Real 4-camera 3D demo](media/realtime-3d-demo.gif)
 
-The demo ([MP4](media/realtime-demo.mp4)) uses the synthetic test rig from
-`backend/realtime/testcapture.py`. A public-domain photo moves quickly on a
-known 3D plane in front of 4 virtual cameras. It was recorded on a 2-core cloud
-CPU without GPU, so the processing segment is shown 8× faster. To regenerate the
-test videos (needs `pip install scikit-image` for the sample photo):
+This demo ([MP4](media/realtime-3d-demo.mp4)) is the public Pose2Sim
+single-person capture: 4 synchronized cameras, 1080×1920 at 60 fps, Qualisys
+calibration. It was processed by this engine and rendered from the saved
+`pose3d.json`. All 100 frames have every joint reconstructed, the median
+reprojection error is 12.7 px, and limb lengths vary by 1.5–5 % across the
+take. See the README for the commands that reproduce it.
 
-```bash
-python -c "import cv2; from skimage import data; from backend.realtime.testcapture import make_capture; make_capture('demo_capture', cv2.cvtColor(data.astronaut(), cv2.COLOR_RGB2BGR), seconds=4)"
-```
+Headless tools that use the same engine as the app:
+
+| Script | Purpose |
+|---|---|
+| `scripts/process_capture.py` | Process calibration + videos without the UI and save the results |
+| `scripts/render_3d_demo.py` | Render camera views + 3D skeleton from a saved result |
+| `scripts/import_qualisys_calibration.py` | Convert a Qualisys `.qca` calibration to `mocap_calibration_v1` |
+| `scripts/pose2d_video.py` | Single-camera 2D pose overlay video (no calibration needed) |
 
 ## Start
 

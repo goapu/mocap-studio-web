@@ -13,9 +13,37 @@ Mocap Studio turns synchronized videos from 2–6 calibrated cameras into tracea
 
 ## Real-time desktop app
 
-![Mocap Studio Live demo: four camera views with live 2D skeletons and the 3D skeleton](docs/media/realtime-demo.gif)
+![Real 4-camera capture processed into a metric 3D skeleton](docs/media/realtime-3d-demo.gif)
 
-*Demo ([MP4, 42 s](docs/media/realtime-demo.mp4)): a synthetic 4-camera test rig in which a public-domain photo of a person moves quickly on a known 3D plane, processed end to end by the real app: setup, live 2D + 3D processing, replay of the smoothed result, saving to disk. It was recorded on a 2-core cloud CPU without GPU while also screen-recording, so the processing segment is shown 8× faster (about 1 frame/s under recording load; about 4 frames/s without it). GPU runs (Apple Silicon with CoreML, CUDA) are expected to be much faster but have not been measured yet. The "processing fps" and "× real time" tiles report it live.*
+**Real multi-camera 3D demo** ([MP4](docs/media/realtime-3d-demo.mp4)). A real person balancing on a platform was filmed by 4 synchronized, calibrated cameras (the public [Pose2Sim](https://github.com/perfanalytics/pose2sim) demo capture, 1080×1920 at 60 fps). Left: the four camera views with the reconstructed 3D pose projected back onto each image. Right: the metric 3D skeleton in meters on a 0.5 m floor grid, with the camera positions. Shown at 0.5× speed.
+
+Measured on this capture, balanced preset with flip test-time augmentation:
+
+| Measure | Result |
+| --- | --- |
+| Frames with every joint reconstructed | 100 % (100 / 100) |
+| Median reprojection error | 12.7 px on 1080×1920 images |
+| Limb-length variation over the take | 1.5–5 % coefficient of variation |
+| Limb lengths (upper arm / forearm / thigh / shank) | 0.27 / 0.26 / 0.41 / 0.38 m |
+| Processing speed | 2.6 fps for 4 cameras on a 2-core cloud CPU without GPU |
+
+A single-camera real-footage 2D example is included as well ([MP4](docs/media/badminton-pose2d-demo.mp4), made with `scripts/pose2d_video.py`). One camera gives 2D only; 3D needs two or more calibrated cameras.
+
+<details>
+<summary>Reproduce the 3D demo</summary>
+
+```bash
+git clone --depth 1 https://github.com/perfanalytics/pose2sim /tmp/pose2sim
+V=/tmp/pose2sim/Pose2Sim/Demo_SinglePerson/videos
+python scripts/process_capture.py examples/pose2sim_demo_calibration.json results --flip \
+  --video cam1=$V/cam01.mp4 --video cam2=$V/cam02.mp4 --video cam3=$V/cam03.mp4 --video cam4=$V/cam04.mp4
+python scripts/render_3d_demo.py results/capture_* demo.mp4 --slowmo 0.5 --loops 3 \
+  --video cam1=$V/cam01.mp4 --video cam2=$V/cam02.mp4 --video cam3=$V/cam03.mp4 --video cam4=$V/cam04.mp4
+```
+
+`examples/pose2sim_demo_calibration.json` was converted from the capture's Qualisys calibration with `scripts/import_qualisys_calibration.py`. You can also open the calibration and the four videos in the desktop app.
+
+</details>
 
 Choose a calibration and one synchronized video per camera, press **Start**, and the app streams every processed frame: each camera view with its 2D skeleton and the 3D skeleton in an orbitable viewer. When the take is finished, it is re-smoothed using past *and* future frames; replay the final result and save it to your computer.
 
@@ -160,9 +188,10 @@ backend/realtime/ui/      Desktop UI (vanilla JS, three.js vendored; no build st
 desktop/launch.py         Desktop launcher (native window via pywebview, browser fallback)
 frontend/src/             Review workstation UI: typed React editor, camera interaction, Three.js viewer
 tests/                    Geometry, workflow and real-time pipeline regression tests
-scripts/                  Setup/start/doctor/desktop, model downloader, benchmark, macOS app builder
+scripts/                  Setup/start/doctor/desktop, model downloader, headless processing, demo rendering,
+                          Qualisys calibration import, single-camera 2D overlay, benchmark, macOS app builder
 docs/                     Architecture, calibration format, validation evidence, real-time app guide
-examples/                 Calibration schema example (not a real rig calibration)
+examples/                 Calibration schema example and the converted Pose2Sim demo calibration
 .github/workflows/ci.yml  Backend/frontend tests, lint, formatting and build
 requirements.txt          Direct dependency versions
 requirements.lock.txt     Tested complete Python dependency set
